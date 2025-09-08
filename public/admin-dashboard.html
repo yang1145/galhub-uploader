@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - 游戏提交平台</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logout-btn {
+            background-color: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .logout-btn:hover {
+            background-color: #c82333;
+        }
+        .games-list {
+            margin-top: 30px;
+        }
+        .game-item {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        .game-title {
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        .game-meta {
+            color: #666;
+            font-size: 14px;
+        }
+        .empty-list {
+            text-align: center;
+            color: #666;
+            padding: 30px;
+        }
+        .filter-form {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: end;
+        }
+        .filter-form .form-group {
+            flex: 1;
+        }
+        .filter-form label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .filter-form input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .filter-form button {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .filter-form button:hover {
+            background-color: #0056b3;
+        }
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .back-link a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .back-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            <span>游戏管理后台</span>
+            <button class="logout-btn" id="logoutBtn">退出登录</button>
+        </h1>
+        
+        <div class="filter-form">
+            <div class="form-group">
+                <label for="search">搜索游戏</label>
+                <input type="text" id="search" placeholder="按游戏名、作者搜索">
+            </div>
+            <button id="searchBtn">搜索</button>
+            <button id="clearBtn">清除</button>
+        </div>
+        
+        <div class="games-list">
+            <h2>已提交的游戏</h2>
+            <div id="gamesList">
+                <div class="empty-list">加载中...</div>
+            </div>
+        </div>
+        
+        <div class="back-link">
+            <a href="/">返回首页</a>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载完成后检查登录状态并获取游戏列表
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+            loadGames();
+        });
+
+        // 检查登录状态
+        function checkAuth() {
+            const token = localStorage.getItem('admin_token');
+            if (!token) {
+                window.location.href = '/admin.html';
+            }
+        }
+
+        // 退出登录
+        document.getElementById('logoutBtn').addEventListener('click', function() {
+            localStorage.removeItem('admin_token');
+            window.location.href = '/admin.html';
+        });
+
+        // 加载游戏列表
+        function loadGames(search = '') {
+            const token = localStorage.getItem('admin_token');
+            if (!token) {
+                window.location.href = '/admin.html';
+                return;
+            }
+
+            let url = '/api/admin/games';
+            if (search) {
+                url += `?search=${encodeURIComponent(search)}`;
+            }
+
+            fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => {
+                if (response.status === 401) {
+                    // Token无效，清除本地存储并跳转到登录页
+                    localStorage.removeItem('admin_token');
+                    window.location.href = '/admin.html';
+                    return;
+                }
+                return response.json();
+            })
+            .then(result => {
+                if (!result) return; // 如果已经跳转则不再处理
+                
+                const gamesList = document.getElementById('gamesList');
+                if (result.data && result.data.length > 0) {
+                    gamesList.innerHTML = result.data.map(game => `
+                        <div class="game-item">
+                            <div class="game-title">${game.game_name}</div>
+                            <div class="game-meta">
+                                <p>作者: ${game.author}</p>
+                                <p>联系方式: ${game.contact}</p>
+                                <p>下载链接: <a href="${game.download_link}" target="_blank">${game.download_link}</a></p>
+                                <p>类型: ${game.is_commercial ? '商业游戏' : '非商业游戏'} ${game.is_repost ? ', 转载游戏' : ''}</p>
+                                <p>提交时间: ${new Date(game.created_at).toLocaleString()}</p>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    gamesList.innerHTML = '<div class="empty-list">暂无提交的游戏</div>';
+                }
+            })
+            .catch(error => {
+                console.error('加载游戏列表失败:', error);
+                document.getElementById('gamesList').innerHTML = '<div class="empty-list">加载游戏列表失败</div>';
+            });
+        }
+
+        // 搜索功能
+        document.getElementById('searchBtn').addEventListener('click', function() {
+            const search = document.getElementById('search').value;
+            loadGames(search);
+        });
+
+        // 清除搜索
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            document.getElementById('search').value = '';
+            loadGames();
+        });
+
+        // 回车搜索
+        document.getElementById('search').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const search = this.value;
+                loadGames(search);
+            }
+        });
+    </script>
+</body>
+</html>
