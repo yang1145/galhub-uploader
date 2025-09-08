@@ -106,7 +106,7 @@ app.post('/api/games', (req, res) => {
 
   const sql = `INSERT INTO games 
     (game_name, author, contact, download_link, is_commercial, is_repost) 
-    VALUES (?, ?, ?, ?, ?, ?)`;
+    VALUES (?, ?, ?, ?, ?, ?`;
 
   db.run(sql, [
     game_name, 
@@ -177,6 +177,25 @@ const authenticateAdmin = (req, res, next) => {
     next();
   });
 };
+
+// 管理员修改密码路由
+app.post('/api/admin/change-password', authenticateAdmin, (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.user.id;
+  
+  // 验证新密码长度
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: '新密码长度至少6位' });
+  }
+  
+  admin.changePassword(userId, currentPassword, newPassword, (err, result) => {
+    if (err) {
+      res.status(400).json({ error: err.message });
+    } else {
+      res.json(result);
+    }
+  });
+});
 
 // 管理员获取游戏列表路由
 app.get('/api/admin/games', authenticateAdmin, (req, res) => {
